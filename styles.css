@@ -85,18 +85,17 @@ header h1 {
   width: 100%;
 }
 
-/* Panel Izquierdo: Lista de Días */
+/* Panel Izquierdo: Lista de Días y Tarjetas de Métricas */
 .sidebar {
-  background-color: #1e293b;
-  border-radius: 8px;
-  padding: 15px;
-  border: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
   height: fit-content;
 }
 
 .sidebar h2 {
   font-size: 1.1rem;
-  margin-bottom: 15px;
+  margin-bottom: 5px;
   color: #f1f5f9;
 }
 
@@ -104,6 +103,10 @@ header h1 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background-color: #1e293b;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #334155;
 }
 
 .daily-row {
@@ -150,6 +153,40 @@ header h1 {
   gap: 8px;
 }
 
+/* Tarjetas de Métricas (Ubicadas verticalmente debajo del pronóstico de 7 días) */
+.cards-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.card {
+  background-color: #1e293b;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  width: 100%;
+}
+
+.card h3 {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.card .value {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #f8fafc;
+}
+
+.card .subtext {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
 /* Panel Derecho: Contenedor */
 .content-area {
   display: flex;
@@ -167,41 +204,6 @@ header h1 {
   border-radius: 8px;
   border: 1px solid #334155;
   background-color: #1e293b;
-}
-
-/* Tarjetas de Métricas Horizontales */
-.cards-grid {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: wrap !important;
-  gap: 15px !important;
-  width: 100% !important;
-}
-
-.card {
-  flex: 1 1 200px !important;
-  background-color: #1e293b;
-  padding: 15px;
-  border-radius: 8px;
-  border: 1px solid #334155;
-}
-
-.card h3 {
-  font-size: 0.85rem;
-  color: #94a3b8;
-  margin-bottom: 8px;
-}
-
-.card .value {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #f8fafc;
-}
-
-.card .subtext {
-  font-size: 0.8rem;
-  color: #64748b;
-  margin-top: 4px;
 }
 
 /* Carrusel por Hora Horizontal */
