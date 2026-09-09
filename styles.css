@@ -75,7 +75,7 @@ header h1 {
   background-color: #1a2234;
 }
 
-/* Layout Principal */
+/* Layout Principal (Dos Columnas) */
 .main-container {
   display: grid !important;
   grid-template-columns: 320px 1fr !important;
@@ -150,7 +150,7 @@ header h1 {
   gap: 8px;
 }
 
-/* Panel Derecho: Mapa y Tarjetas */
+/* Panel Derecho: Contenedor */
 .content-area {
   display: flex;
   flex-direction: column;
@@ -159,6 +159,7 @@ header h1 {
   min-width: 0;
 }
 
+/* Mapa */
 #map,
 #map iframe {
   width: 100% !important;
@@ -168,14 +169,17 @@ header h1 {
   background-color: #1e293b;
 }
 
-/* Tarjetas de Clima Actual */
+/* Tarjetas de Métricas Horizontales */
 .cards-grid {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
   gap: 15px !important;
+  width: 100% !important;
 }
 
 .card {
+  flex: 1 1 200px !important;
   background-color: #1e293b;
   padding: 15px;
   border-radius: 8px;
@@ -200,13 +204,14 @@ header h1 {
   margin-top: 4px;
 }
 
-/* Carrusel de Horas Horizontal */
+/* Carrusel por Hora Horizontal */
 .hourly-section {
   background-color: #1e293b;
   padding: 15px;
   border-radius: 8px;
   border: 1px solid #334155;
   width: 100%;
+  min-width: 0;
 }
 
 .hourly-section h3 {
@@ -218,10 +223,11 @@ header h1 {
 .hourly-container {
   display: flex !important;
   flex-direction: row !important;
+  flex-wrap: nowrap !important;
   gap: 12px !important;
   overflow-x: auto !important;
-  padding-bottom: 8px;
-  width: 100%;
+  padding-bottom: 12px !important;
+  width: 100% !important;
 }
 
 .hourly-container::-webkit-scrollbar {
@@ -234,16 +240,18 @@ header h1 {
 }
 
 .hourly-card {
-  min-width: 75px !important;
+  min-width: 80px !important;
+  width: 80px !important;
+  flex-shrink: 0 !important;
   background-color: #0f172a;
   padding: 10px 8px;
   border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid #334155;
   font-size: 0.85rem;
-  border: 1px solid #1e293b;
-  flex-shrink: 0;
 }
 
 .hourly-card .temp {
@@ -262,7 +270,7 @@ footer {
   margin-top: auto;
 }
 
-/* Responsivo */
+/* Responsividad para Móviles */
 @media (max-width: 900px) {
   .main-container {
     grid-template-columns: 1fr !important;
