@@ -10,7 +10,7 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    <link rel="stylesheet" href="styles.css?v=4.0" />
+    <link rel="stylesheet" href="styles.css?v=6.0" />
   </head>
   <body>
     <!-- Encabezado y Buscador -->
@@ -27,12 +27,14 @@
 
     <!-- Layout Principal -->
     <div class="main-container">
-      <!-- Panel Izquierdo: Lista de Días + Tarjetas de Información -->
+      <!-- Columna Izquierda: Pronóstico 7 Días + Tarjetas (Métricas) -->
       <aside class="sidebar">
-        <h2>Pronóstico 7 Días</h2>
-        <div id="dailyContainer" class="daily-container"></div>
+        <div class="daily-section">
+          <h2>Pronóstico 7 Días</h2>
+          <div id="dailyContainer" class="daily-container"></div>
+        </div>
 
-        <!-- Tarjetas movidas al panel izquierdo (Debajo de los 7 días) -->
+        <!-- Tarjetas de métricas situadas bajo el pronóstico de 7 días -->
         <div class="cards-grid">
           <div class="card">
             <h3>Temperatura Actual</h3>
@@ -65,11 +67,10 @@
         </div>
       </aside>
 
-      <!-- Panel Derecho: Mapa y Carrusel por Hora -->
+      <!-- Columna Derecha: Mapa + Pronóstico por Hora -->
       <main class="content-area">
         <div id="map"></div>
 
-        <!-- Carrusel por Hora -->
         <div class="hourly-section">
           <h3>Pronóstico por Hora <span id="selectedDayLabel"></span></h3>
           <div id="hourlyContainer" class="hourly-container"></div>

@@ -75,7 +75,7 @@ header h1 {
   background-color: #1a2234;
 }
 
-/* Layout Principal (Dos Columnas) */
+/* Layout Principal */
 .main-container {
   display: grid !important;
   grid-template-columns: 320px 1fr !important;
@@ -85,17 +85,24 @@ header h1 {
   width: 100%;
 }
 
-/* Panel Izquierdo: Lista de Días y Tarjetas de Métricas */
+/* Sidebar Izquierda (Columna de Pronóstico y Métricas) */
 .sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  height: fit-content;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 15px !important;
+  width: 100% !important;
 }
 
-.sidebar h2 {
+.daily-section {
+  background-color: #1e293b;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #334155;
+}
+
+.daily-section h2 {
   font-size: 1.1rem;
-  margin-bottom: 5px;
+  margin-bottom: 12px;
   color: #f1f5f9;
 }
 
@@ -103,10 +110,6 @@ header h1 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background-color: #1e293b;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #334155;
 }
 
 .daily-row {
@@ -153,7 +156,7 @@ header h1 {
   gap: 8px;
 }
 
-/* Tarjetas de Métricas (Ubicadas verticalmente debajo del pronóstico de 7 días) */
+/* Tarjetas de Métricas en Columna Izquierda */
 .cards-grid {
   display: flex !important;
   flex-direction: column !important;
@@ -166,7 +169,7 @@ header h1 {
   padding: 14px;
   border-radius: 8px;
   border: 1px solid #334155;
-  width: 100%;
+  width: 100% !important;
 }
 
 .card h3 {
@@ -187,7 +190,7 @@ header h1 {
   margin-top: 4px;
 }
 
-/* Panel Derecho: Contenedor */
+/* Columna Derecha */
 .content-area {
   display: flex;
   flex-direction: column;
@@ -206,7 +209,7 @@ header h1 {
   background-color: #1e293b;
 }
 
-/* Carrusel por Hora Horizontal */
+/* Pronóstico por Hora */
 .hourly-section {
   background-color: #1e293b;
   padding: 15px;
@@ -272,7 +275,7 @@ footer {
   margin-top: auto;
 }
 
-/* Responsividad para Móviles */
+/* Adaptación a dispositivos móviles */
 @media (max-width: 900px) {
   .main-container {
     grid-template-columns: 1fr !important;
