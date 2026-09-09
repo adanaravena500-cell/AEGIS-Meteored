@@ -10,144 +10,84 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=3.0" />
   </head>
   <body>
     <!-- Encabezado y Buscador -->
-    <header class="top-bar">
+    <header>
       <h1 id="cityName">Cargando...</h1>
       <div class="search-box">
         <input type="text" id="cityInput" placeholder="Buscar ciudad..." />
         <button id="searchBtn" type="button">Buscar</button>
-        <button id="downloadPdfBtn" type="button" class="btn-pdf">
-          📄 Exportar PDF
-        </button>
+        <button id="downloadPdfBtn" type="button">📄 Exportar PDF</button>
       </div>
     </header>
 
     <div class="breadcrumb" id="breadcrumb">Inicio > Clima</div>
 
-    <!-- Grilla Principal (2 Columnas: Pronóstico a la Izquierda | Mapa a la Derecha) -->
-    <div class="main-grid">
-      <!-- Columna Izquierda: Pronóstico 7 días -->
-      <aside class="left-column">
+    <!-- Layout Principal -->
+    <div class="main-container">
+      <!-- Panel Izquierdo: Lista de Días -->
+      <aside class="sidebar">
         <h2>Pronóstico 7 Días</h2>
-        <div id="dailyContainer"></div>
+        <div id="dailyContainer" class="daily-container"></div>
       </aside>
 
-      <!-- Columna Derecha: Mapamundi e Selector de Vista -->
-      <main class="right-column">
-        <div id="mapTypeBar"></div>
+      <!-- Panel Derecho: Mapa y Métricas -->
+      <main class="content-area">
         <div id="map"></div>
+
+        <!-- Tarjetas de Clima Actual -->
+        <div class="cards-grid">
+          <div class="card">
+            <h3>Temperatura Actual</h3>
+            <p class="value"><span id="tempValue">--</span>°C</p>
+            <p class="subtext" id="weatherDesc">--</p>
+          </div>
+
+          <div class="card">
+            <h3>Sensación Térmica</h3>
+            <p class="value" id="realFeel">--°C</p>
+          </div>
+
+          <div class="card">
+            <h3>Viento / Ráfagas</h3>
+            <p class="subtext">
+              <strong>Velocidad:</strong> <span id="windSpeed">--</span>
+            </p>
+            <p class="subtext">
+              <strong>Ráfagas:</strong> <span id="windGusts">--</span>
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>Sol y Calidad del Aire</h3>
+            <p class="subtext" id="sunTimes">Salida: --:-- | Puesta: --:--</p>
+            <p class="subtext">
+              <strong>Aire:</strong> <span id="airQualityText">--</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Carrusel por Hora -->
+        <div class="hourly-section">
+          <h3>Pronóstico por Hora <span id="selectedDayLabel"></span></h3>
+          <div id="hourlyContainer" class="hourly-container"></div>
+        </div>
       </main>
     </div>
 
-    <!-- Sección Inferior: Información Detallada y Pronóstico por Hora -->
-    <section class="bottom-section">
-      <!-- Tarjetas de Métricas -->
-      <div class="metrics-grid">
-        <div class="card">
-          <h3>Temperatura Actual</h3>
-          <p class="big-value"><span id="tempValue">--</span>°C</p>
-          <p id="weatherDesc">--</p>
-        </div>
-
-        <div class="card">
-          <h3>Sensación Térmica</h3>
-          <p class="big-value" id="realFeel">--°C</p>
-        </div>
-
-        <div class="card">
-          <h3>Viento / Ráfagas</h3>
-          <p><strong>Velocidad:</strong> <span id="windSpeed">--</span></p>
-          <p><strong>Ráfagas:</strong> <span id="windGusts">--</span></p>
-        </div>
-
-        <div class="card">
-          <h3>Sol y Calidad del Aire</h3>
-          <p id="sunTimes">Salida: --:-- | Puesta: --:--</p>
-          <p><strong>Aire:</strong> <span id="airQualityText">--</span></p>
-        </div>
-      </div>
-
-      <!-- Carrusel por Hora -->
-      <div class="hourly-section">
-        <h3>Pronóstico por Hora <span id="selectedDayLabel"></span></h3>
-        <div id="hourlyContainer" class="hourly-carousel"></div>
-      </div>
-    </section>
-
-    <!-- Pie de Página: Derechos de Autor, Términos y Legal -->
-    <footer
-      style="
-        margin-top: 40px;
-        padding: 25px 15px;
-        background: #090d16;
-        border-top: 1px solid #1e293b;
-        color: #64748b;
-        font-size: 0.85rem;
-        text-align: center;
-        border-radius: 8px;
-      "
-    >
-      <div
-        style="
-          max-width: 1000px;
-          margin: 0 auto;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          align-items: center;
-        "
-      >
-        <p style="color: #94a3b8">
-          &copy; <span id="currentYear"></span>
-          <strong>AEGIS Weather System</strong>. Todos los derechos reservados.
-        </p>
-
-        <div
-          style="
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
-          "
-        >
-          <a href="#terminos" style="color: #38bdf8; text-decoration: none"
-            >Términos de Servicio</a
-          >
-          <span>|</span>
-          <a href="#privacidad" style="color: #38bdf8; text-decoration: none"
-            >Política de Privacidad</a
-          >
-          <span>|</span>
-          <a href="#contacto" style="color: #38bdf8; text-decoration: none"
-            >Contacto & Soporte</a
-          >
-        </div>
-
-        <p
-          style="
-            font-size: 0.75rem;
-            color: #475569;
-            max-width: 800px;
-            margin-top: 5px;
-          "
-        >
-          <strong>Aviso Legal:</strong> La información meteorológica
-          proporcionada por esta aplicación proviene de servicios de código
-          abierto y APIs públicas (Open-Meteo, OpenStreetMap, Windy). AEGIS
-          Weather System no garantiza la precisión absoluta de los pronósticos y
-          no se hace responsable por decisiones tomadas en base a estos datos.
-        </p>
-      </div>
+    <!-- Pie de Página -->
+    <footer>
+      <p>
+        &copy; <span id="currentYear"></span>
+        <strong>AEGIS Weather System</strong>. Todos los derechos reservados.
+      </p>
     </footer>
 
-    <!-- Librería PDFMake para generación vectorial de PDFs de texto real -->
+    <!-- Librerías JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-
-    <!-- Leaflet JS y JS Principal -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
   </body>
