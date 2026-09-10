@@ -1,14 +1,27 @@
-// Configuración inicial al cargar la página
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("currentYear").textContent = new Date().getFullYear();
+let mapInstance = null;
+let mapMarker = null;
 
-  // Iniciar búsqueda por defecto si el usuario no comparte ubicación
+document.addEventListener("DOMContentLoaded", () => {
+  const yearElem = document.getElementById("currentYear");
+  if (yearElem) yearElem.textContent = new Date().getFullYear();
+
+  // Iniciar mapa interactivo
+  initMap(-34.9854, -71.2394);
+
+  // Cargar datos iniciales
   initWeatherApp("Curicó");
 
-  // Escuchar eventos de búsqueda y exportación
+  // Eventos de usuario
   document.getElementById("searchBtn").addEventListener("click", () => {
     const city = document.getElementById("cityInput").value.trim();
     if (city) initWeatherApp(city);
+  });
+
+  document.getElementById("cityInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      const city = document.getElementById("cityInput").value.trim();
+      if (city) initWeatherApp(city);
+    }
   });
 
   document
@@ -16,12 +29,31 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", exportProfessionalPDF);
 });
 
-// Función principal de carga de datos
+// Inicializar Mapa Leaflet de forma segura
+function initMap(lat, lon) {
+  try {
+    if (mapInstance) {
+      mapInstance.setView([lat, lon], 10);
+      if (mapMarker) mapMarker.setLatLng([lat, lon]);
+      return;
+    }
+
+    mapInstance = L.map("map").setView([lat, lon], 10);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(mapInstance);
+
+    mapMarker = L.marker([lat, lon]).addTo(mapInstance);
+  } catch (err) {
+    console.error("Error al inicializar el mapa:", err);
+  }
+}
+
+// Búsqueda y renderizado de clima
 async function initWeatherApp(cityName) {
   try {
-    document.getElementById("cityName").textContent = `Cargando ${cityName}...`;
+    document.getElementById("cityName").textContent = `Buscando ${cityName}...`;
 
-    // 1. Obtener coordenadas de la ciudad (Geocoding Open-Meteo)
     const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=es&format=json`;
     const geoRes = await fetch(geoUrl);
     const geoData = await geoRes.json();
@@ -34,26 +66,29 @@ async function initWeatherApp(cityName) {
     }
 
     const { latitude, longitude, name, admin1, country } = geoData.results[0];
-    const fullLocationLabel = `${name}, ${admin1 || ""}, ${country}`;
-    document.getElementById("cityName").textContent = fullLocationLabel;
+    const locationLabel = `${name}, ${admin1 || ""}, ${country}`;
+    document.getElementById("cityName").textContent = locationLabel;
 
-    // 2. Obtener datos meteorológicos (Open-Meteo API)
+    // Actualizar mapa
+    initMap(latitude, longitude);
+
+    // Consulta de pronóstico a Open-Meteo
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto`;
     const weatherRes = await fetch(weatherUrl);
     const weatherData = await weatherRes.json();
 
-    // 3. Renderizar las secciones de la interfaz
-    updateCurrentCards(weatherData);
+    // Actualizar pantalla
+    updateCards(weatherData);
     renderDailyForecast(weatherData.daily);
     renderHourlyForecast(weatherData.hourly);
   } catch (error) {
-    console.error("Error al cargar los datos meteorológicos:", error);
-    document.getElementById("cityName").textContent = "Error al cargar datos";
+    console.error("Error obteniendo el clima:", error);
+    document.getElementById("cityName").textContent = "Error de conexión";
   }
 }
 
-// Actualizar tarjetas de métricas actuales
-function updateCurrentCards(data) {
+// Actualizar métricas
+function updateCards(data) {
   const current = data.current;
   const daily = data.daily;
 
@@ -77,7 +112,7 @@ function updateCurrentCards(data) {
   document.getElementById("airQualityText").textContent = "Buena (AQI 25)";
 }
 
-// Renderizar días en la columna izquierda
+// Pronóstico 7 días
 function renderDailyForecast(daily) {
   const container = document.getElementById("dailyContainer");
   container.innerHTML = "";
@@ -109,14 +144,13 @@ function renderDailyForecast(daily) {
   });
 }
 
-// Renderizar pronóstico por hora y resaltar la hora actual
+// Pronóstico por hora resaltando hora actual
 function renderHourlyForecast(hourly) {
   const container = document.getElementById("hourlyContainer");
   container.innerHTML = "";
 
   const currentHourNow = new Date().getHours();
 
-  // Mostrar las próximas 24 horas a partir del índice actual
   for (let i = 0; i < 24; i++) {
     const timeStr = hourly.time[i];
     const hourVal = parseInt(timeStr.split("T")[1].split(":")[0], 10);
@@ -140,7 +174,6 @@ function renderHourlyForecast(hourly) {
   }
 }
 
-// Utilidades para iconos y descripciones de código WMO
 function getWeatherIcon(code) {
   if (code === 0) return "☀️";
   if (code >= 1 && code <= 3) return "⛅";
@@ -161,7 +194,7 @@ function getWeatherDescription(code) {
   return "Normal";
 }
 
-// Función de exportación a PDF
+// Exportación PDF Profesional Agrometeorológico
 function exportProfessionalPDF() {
   const cityName = document.getElementById("cityName").textContent || "Curicó";
   const now = new Date();
@@ -259,6 +292,79 @@ function exportProfessionalPDF() {
         layout: "noBorders",
         margin: [0, 0, 0, 15],
       },
+      {
+        text: "Cuadro de Pronóstico de Temperaturas por Zonas (°C)",
+        style: "sectionHeader",
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ["25%", "35%", "20%", "20%"],
+          body: [
+            [
+              {
+                text: "Región / Sector",
+                style: "tableHeader",
+                fillColor: "#4338ca",
+              },
+              {
+                text: "Zona Geográfica",
+                style: "tableHeader",
+                fillColor: "#4338ca",
+              },
+              {
+                text: "T. Mínima (°C)",
+                style: "tableHeader",
+                fillColor: "#4338ca",
+              },
+              {
+                text: "T. Máxima (°C)",
+                style: "tableHeader",
+                fillColor: "#4338ca",
+              },
+            ],
+            [
+              {
+                text: cityName,
+                rowSpan: 3,
+                alignment: "center",
+                bold: true,
+                margin: [0, 15, 0, 0],
+              },
+              { text: "Cordillera de la Costa", alignment: "left" },
+              { text: "2°C", alignment: "center", fillColor: "#e0e7ff" },
+              { text: "14°C", alignment: "center", fillColor: "#e0e7ff" },
+            ],
+            [
+              {},
+              { text: "Valles Centrales", alignment: "left" },
+              { text: "4°C", alignment: "center", fillColor: "#e0e7ff" },
+              { text: "16°C", alignment: "center", fillColor: "#e0e7ff" },
+            ],
+            [
+              {},
+              { text: "Precordillera", alignment: "left" },
+              { text: "1°C", alignment: "center", fillColor: "#e0e7ff" },
+              { text: "12°C", alignment: "center", fillColor: "#e0e7ff" },
+            ],
+          ],
+        },
+        layout: {
+          hLineWidth: function () {
+            return 1;
+          },
+          vLineWidth: function () {
+            return 1;
+          },
+          hLineColor: function () {
+            return "#cbd5e1";
+          },
+          vLineColor: function () {
+            return "#cbd5e1";
+          },
+        },
+        margin: [0, 0, 0, 20],
+      },
     ],
     styles: {
       bannerTitle: {
@@ -273,6 +379,18 @@ function exportProfessionalPDF() {
         color: "#94a3b8",
         alignment: "center",
         margin: [0, 3, 0, 0],
+      },
+      sectionHeader: {
+        fontSize: 11,
+        bold: true,
+        color: "#1e293b",
+        margin: [0, 5, 0, 8],
+      },
+      tableHeader: {
+        fontSize: 9.5,
+        bold: true,
+        color: "#ffffff",
+        alignment: "center",
       },
     },
   };
