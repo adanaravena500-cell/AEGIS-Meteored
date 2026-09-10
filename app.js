@@ -1,3 +1,6 @@
+let leafletMap = null;
+let currentMarker = null;
+
 document.addEventListener("DOMContentLoaded", () => {
   const yearElem = document.getElementById("currentYear");
   if (yearElem) yearElem.textContent = new Date().getFullYear();
@@ -5,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Cargar datos iniciales (Curicó)
   initWeatherApp("Curicó");
 
-  // Eventos de usuario
+  // Eventos
   document.getElementById("searchBtn").addEventListener("click", () => {
     const city = document.getElementById("cityInput").value.trim();
     if (city) initWeatherApp(city);
@@ -23,20 +26,62 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", exportProfessionalPDF);
 });
 
-// Actualizar Mapa Sinóptico ECMWF con Isobaras
-function initMap(lat, lon) {
+// Renderizar Mapa Leaflet con fondo oscuro libre de CARTO + Radar RainViewer
+function renderLeafletMap(lat, lon, label) {
+  if (leafletMap !== null) {
+    leafletMap.remove();
+  }
+
+  leafletMap = L.map("map").setView([lat, lon], 7);
+
+  // Capa base Oscura CARTO (Gratis sin API Key)
+  const darkLayer = L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 18,
+    },
+  ).addTo(leafletMap);
+
+  // Marcador en la ubicación buscada
+  currentMarker = L.marker([lat, lon])
+    .addTo(leafletMap)
+    .bindPopup(`<b>${label}</b>`)
+    .openPopup();
+
+  // Capa de Radar RainViewer (Gratis)
+  const rainRadar = L.tileLayer(
+    "https://tile.rainviewer.com/v2/radar/nowcast_5/256/{z}/{x}/{y}/2/1_1.png",
+    {
+      opacity: 0.7,
+      attribution: "&copy; RainViewer",
+    },
+  ).addTo(leafletMap);
+
+  const overlayMaps = {
+    "Radar de Lluvia y Clima": rainRadar,
+  };
+
+  L.control
+    .layers(null, overlayMaps, { position: "topright" })
+    .addTo(leafletMap);
+}
+
+// Actualizar Mapa Sinóptico ECMWF (Iframe Windy)
+function initWindyMap(lat, lon) {
   const iframe = document.getElementById("meteoredMap");
   if (iframe) {
     iframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=100%25&height=500&zoom=5&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
   }
 }
 
-// Búsqueda y renderizado de clima
+// Búsqueda y gestión de datos de clima
 async function initWeatherApp(cityName) {
   try {
     document.getElementById("cityName").textContent = `Buscando ${cityName}...`;
 
-    // Geocodificación vía Open-Meteo
     const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=es&format=json`;
     const geoRes = await fetch(geoUrl);
     const geoData = await geoRes.json();
@@ -52,15 +97,15 @@ async function initWeatherApp(cityName) {
     const locationLabel = `${name}, ${admin1 || ""}, ${country}`;
     document.getElementById("cityName").textContent = locationLabel;
 
-    // Actualizar iframe de mapa sinóptico
-    initMap(latitude, longitude);
+    // Actualizar mapas
+    renderLeafletMap(latitude, longitude, locationLabel);
+    initWindyMap(latitude, longitude);
 
-    // Consulta de pronóstico a Open-Meteo
+    // Consulta de datos climáticos
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto`;
     const weatherRes = await fetch(weatherUrl);
     const weatherData = await weatherRes.json();
 
-    // Actualizar componentes UI
     updateCards(weatherData);
     renderDailyForecast(weatherData.daily);
     renderHourlyForecast(weatherData.hourly);
@@ -70,7 +115,6 @@ async function initWeatherApp(cityName) {
   }
 }
 
-// Actualizar tarjetas de métricas
 function updateCards(data) {
   const current = data.current;
   const daily = data.daily;
@@ -95,7 +139,6 @@ function updateCards(data) {
   document.getElementById("airQualityText").textContent = "Buena (AQI 25)";
 }
 
-// Pronóstico 7 días
 function renderDailyForecast(daily) {
   const container = document.getElementById("dailyContainer");
   container.innerHTML = "";
@@ -127,7 +170,6 @@ function renderDailyForecast(daily) {
   });
 }
 
-// Pronóstico por hora con hora actual resaltada
 function renderHourlyForecast(hourly) {
   const container = document.getElementById("hourlyContainer");
   container.innerHTML = "";
@@ -177,7 +219,7 @@ function getWeatherDescription(code) {
   return "Normal";
 }
 
-// Exportación PDF Profesional Agrometeorológico
+// Generación del informe agrometeorológico PDF
 function exportProfessionalPDF() {
   const cityName = document.getElementById("cityName").textContent || "Curicó";
   const now = new Date();
