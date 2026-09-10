@@ -26,15 +26,16 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", exportProfessionalPDF);
 });
 
-// Renderizar Mapa Leaflet con fondo oscuro libre de CARTO + Radar RainViewer
+// Renderizar Mapa Leaflet con selector de mapas base (Oscuro y Satélite)
 function renderLeafletMap(lat, lon, label) {
   if (leafletMap !== null) {
     leafletMap.remove();
   }
 
-  leafletMap = L.map("map").setView([lat, lon], 7);
+  // 1. Inicializar objeto de mapa
+  leafletMap = L.map("map").setView([lat, lon], 8);
 
-  // Capa base Oscura CARTO (Gratis sin API Key)
+  // 2. Definir Mapas Base (Base Layers)
   const darkLayer = L.tileLayer(
     "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
     {
@@ -43,15 +44,29 @@ function renderLeafletMap(lat, lon, label) {
       subdomains: "abcd",
       maxZoom: 18,
     },
-  ).addTo(leafletMap);
+  );
 
-  // Marcador en la ubicación buscada
-  currentMarker = L.marker([lat, lon])
-    .addTo(leafletMap)
-    .bindPopup(`<b>${label}</b>`)
-    .openPopup();
+  const satelliteLayer = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {
+      attribution:
+        "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+      maxZoom: 18,
+    },
+  );
 
-  // Capa de Radar RainViewer (Gratis)
+  const osmStandardLayer = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 19,
+    },
+  );
+
+  // Activar la capa oscura por defecto
+  darkLayer.addTo(leafletMap);
+
+  // 3. Capa de Superposición (Radar RainViewer)
   const rainRadar = L.tileLayer(
     "https://tile.rainviewer.com/v2/radar/nowcast_5/256/{z}/{x}/{y}/2/1_1.png",
     {
@@ -60,12 +75,26 @@ function renderLeafletMap(lat, lon, label) {
     },
   ).addTo(leafletMap);
 
-  const overlayMaps = {
-    "Radar de Lluvia y Clima": rainRadar,
+  // 4. Marcador de ubicación
+  currentMarker = L.marker([lat, lon])
+    .addTo(leafletMap)
+    .bindPopup(`<b>${label}</b>`)
+    .openPopup();
+
+  // 5. Configurar el Control de Capas para que el usuario cambie entre mapas
+  const baseMaps = {
+    "🌙 Mapa Oscuro": darkLayer,
+    "🛰️ Vista Satélite": satelliteLayer,
+    "🗺️ OpenStreetMap": osmStandardLayer,
   };
 
+  const overlayMaps = {
+    "🌧️ Radar de Lluvia y Clima": rainRadar,
+  };
+
+  // Añadir selector interactivo en la esquina superior derecha
   L.control
-    .layers(null, overlayMaps, { position: "topright" })
+    .layers(baseMaps, overlayMaps, { position: "topright", collapsed: false })
     .addTo(leafletMap);
 }
 
