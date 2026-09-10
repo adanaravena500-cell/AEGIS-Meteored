@@ -1,14 +1,8 @@
-let mapInstance = null;
-let mapMarker = null;
-
 document.addEventListener("DOMContentLoaded", () => {
   const yearElem = document.getElementById("currentYear");
   if (yearElem) yearElem.textContent = new Date().getFullYear();
 
-  // Inicializar mapa predeterminado en Curicó con capa de radar
-  initMap(-34.9854, -71.2394);
-
-  // Cargar datos del clima
+  // Cargar datos iniciales (Curicó)
   initWeatherApp("Curicó");
 
   // Eventos de usuario
@@ -29,51 +23,11 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", exportProfessionalPDF);
 });
 
-// Inicializar Mapa Leaflet con capa de Radar Climático en Tiempo Real
+// Actualizar Mapa Sinóptico ECMWF con Isobaras
 function initMap(lat, lon) {
-  try {
-    if (mapInstance) {
-      mapInstance.setView([lat, lon], 8);
-      if (mapMarker) mapMarker.setLatLng([lat, lon]);
-      return;
-    }
-
-    // 1. Crear mapa centrado
-    mapInstance = L.map("map").setView([lat, lon], 8);
-
-    // 2. Mapa Base Oscuro CartoDB
-    const baseMap = L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: "abcd",
-        maxZoom: 19,
-      },
-    ).addTo(mapInstance);
-
-    // 3. Capa de Radar de Precipitación y Tormentas en Vivo (RainViewer)
-    const radarLayer = L.tileLayer(
-      "https://tilecache.rainviewer.com/v2/radar/nowcast/256/{z}/{x}/{y}/2/1_1.png",
-      {
-        opacity: 0.7,
-        attribution:
-          'Clima &copy; <a href="https://www.rainviewer.com/">RainViewer</a>',
-      },
-    ).addTo(mapInstance);
-
-    // 4. Control de Capas
-    const overlayMaps = {
-      "Radar de Lluvia y Clima": radarLayer,
-    };
-    L.control
-      .layers(null, overlayMaps, { collapsed: false })
-      .addTo(mapInstance);
-
-    // Marcador de Ubicación
-    mapMarker = L.marker([lat, lon]).addTo(mapInstance);
-  } catch (err) {
-    console.error("Error al inicializar el mapa:", err);
+  const iframe = document.getElementById("meteoredMap");
+  if (iframe) {
+    iframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=100%25&height=500&zoom=5&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
   }
 }
 
@@ -82,7 +36,7 @@ async function initWeatherApp(cityName) {
   try {
     document.getElementById("cityName").textContent = `Buscando ${cityName}...`;
 
-    // Geocodificación
+    // Geocodificación vía Open-Meteo
     const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=es&format=json`;
     const geoRes = await fetch(geoUrl);
     const geoData = await geoRes.json();
@@ -98,7 +52,7 @@ async function initWeatherApp(cityName) {
     const locationLabel = `${name}, ${admin1 || ""}, ${country}`;
     document.getElementById("cityName").textContent = locationLabel;
 
-    // Actualizar vista del mapa y marcador
+    // Actualizar iframe de mapa sinóptico
     initMap(latitude, longitude);
 
     // Consulta de pronóstico a Open-Meteo
@@ -106,7 +60,7 @@ async function initWeatherApp(cityName) {
     const weatherRes = await fetch(weatherUrl);
     const weatherData = await weatherRes.json();
 
-    // Actualizar componentes en pantalla
+    // Actualizar componentes UI
     updateCards(weatherData);
     renderDailyForecast(weatherData.daily);
     renderHourlyForecast(weatherData.hourly);
@@ -223,7 +177,7 @@ function getWeatherDescription(code) {
   return "Normal";
 }
 
-// Exportación a PDF Informe Agrometeorológico
+// Exportación PDF Profesional Agrometeorológico
 function exportProfessionalPDF() {
   const cityName = document.getElementById("cityName").textContent || "Curicó";
   const now = new Date();

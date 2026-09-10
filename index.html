@@ -4,16 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AEGIS Meteored Analysing</title>
-
-    <!-- Leaflet CSS -->
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
-    <link rel="stylesheet" href="styles.css?v=11.0" />
+    <link rel="stylesheet" href="styles.css?v=12.0" />
   </head>
   <body>
-    <!-- Encabezado con Nombre Principal Grande -->
+    <!-- Encabezado Principal -->
     <header>
       <div class="brand-title">
         <h1>AEGIS Meteored Analysing</h1>
@@ -26,7 +20,9 @@
       </div>
     </header>
 
-    <div class="breadcrumb" id="breadcrumb">Inicio > Clima</div>
+    <div class="breadcrumb" id="breadcrumb">
+      Inicio > Clima > Mapa Sinóptico ECMWF
+    </div>
 
     <!-- Layout Principal -->
     <div class="main-container">
@@ -70,9 +66,16 @@
         </div>
       </aside>
 
-      <!-- Columna Derecha: Mapa Climático + Pronóstico por Hora -->
+      <!-- Columna Derecha: Mapa Sinóptico ECMWF con Isobaras + Pronóstico por Hora -->
       <main class="content-area">
-        <div id="map"></div>
+        <div class="map-container">
+          <iframe
+            id="meteoredMap"
+            src="https://embed.windy.com/embed2.html?lat=-34.985&lon=-71.239&detailLat=-34.985&detailLon=-71.239&width=100%25&height=500&zoom=5&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1"
+            frameborder="0"
+          >
+          </iframe>
+        </div>
 
         <div class="hourly-section">
           <h3>Pronóstico por Hora <span id="selectedDayLabel"></span></h3>
@@ -107,10 +110,9 @@
       </div>
     </footer>
 
-    <!-- Librerías JS -->
+    <!-- Librerías JS para PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="app.js?v=11.0"></script>
+    <script src="app.js?v=12.0"></script>
   </body>
 </html>
