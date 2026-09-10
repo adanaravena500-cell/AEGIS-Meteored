@@ -1,14 +1,15 @@
 let leafletMap = null;
 let currentMarker = null;
+let currentCoords = { lat: -34.985, lon: -71.239, label: "Curicó, Chile" };
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearElem = document.getElementById("currentYear");
   if (yearElem) yearElem.textContent = new Date().getFullYear();
 
-  // Cargar datos iniciales (Curicó)
-  initWeatherApp("Curicó");
+  // Cargar datos por defecto de Curicó sin tildes para evitar errores de codificación
+  initWeatherApp("Curico");
 
-  // Eventos
+  // Eventos de búsqueda
   document.getElementById("searchBtn").addEventListener("click", () => {
     const city = document.getElementById("cityInput").value.trim();
     if (city) initWeatherApp(city);
@@ -21,98 +22,79 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Alternar entre tipos de mapa
+  const btnWindy = document.getElementById("btnMapWindy");
+  const btnPhysical = document.getElementById("btnMapPhysical");
+  const windyContainer = document.getElementById("windyContainer");
+  const physicalContainer = document.getElementById("physicalContainer");
+
+  btnWindy.addEventListener("click", () => {
+    btnWindy.classList.add("active");
+    btnPhysical.classList.remove("active");
+    windyContainer.classList.remove("hidden");
+    physicalContainer.classList.add("hidden");
+  });
+
+  btnPhysical.addEventListener("click", () => {
+    btnPhysical.classList.add("active");
+    btnWindy.classList.remove("active");
+    physicalContainer.classList.remove("hidden");
+    windyContainer.classList.add("hidden");
+
+    // Inicializar mapa físico si no se ha renderizado
+    renderPhysicalMap(
+      currentCoords.lat,
+      currentCoords.lon,
+      currentCoords.label,
+    );
+  });
+
   document
     .getElementById("downloadPdfBtn")
     .addEventListener("click", exportProfessionalPDF);
 });
 
-// Renderizar Mapa Leaflet con selector de mapas base (Oscuro y Satélite)
-function renderLeafletMap(lat, lon, label) {
+// Renderizar Mapa Físico / Topográfico (Leaflet)
+function renderPhysicalMap(lat, lon, label) {
   if (leafletMap !== null) {
     leafletMap.remove();
   }
 
-  // 1. Inicializar objeto de mapa
-  leafletMap = L.map("map").setView([lat, lon], 8);
+  leafletMap = L.map("map").setView([lat, lon], 7);
 
-  // 2. Definir Mapas Base (Base Layers)
-  const darkLayer = L.tileLayer(
-    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  // Mapa base Topográfico / Físico
+  const topoLayer = L.tileLayer(
+    "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     {
+      maxZoom: 17,
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: "abcd",
-      maxZoom: 18,
-    },
-  );
-
-  const satelliteLayer = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    {
-      attribution:
-        "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-      maxZoom: 18,
-    },
-  );
-
-  const osmStandardLayer = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-      attribution: "&copy; OpenStreetMap contributors",
-      maxZoom: 19,
-    },
-  );
-
-  // Activar la capa oscura por defecto
-  darkLayer.addTo(leafletMap);
-
-  // 3. Capa de Superposición (Radar RainViewer)
-  const rainRadar = L.tileLayer(
-    "https://tile.rainviewer.com/v2/radar/nowcast_5/256/{z}/{x}/{y}/2/1_1.png",
-    {
-      opacity: 0.7,
-      attribution: "&copy; RainViewer",
+        "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap",
     },
   ).addTo(leafletMap);
 
-  // 4. Marcador de ubicación
   currentMarker = L.marker([lat, lon])
     .addTo(leafletMap)
     .bindPopup(`<b>${label}</b>`)
     .openPopup();
 
-  // 5. Configurar el Control de Capas para que el usuario cambie entre mapas
-  const baseMaps = {
-    "🌙 Mapa Oscuro": darkLayer,
-    "🛰️ Vista Satélite": satelliteLayer,
-    "🗺️ OpenStreetMap": osmStandardLayer,
-  };
-
-  const overlayMaps = {
-    "🌧️ Radar de Lluvia y Clima": rainRadar,
-  };
-
-  // Añadir selector interactivo en la esquina superior derecha
-  L.control
-    .layers(baseMaps, overlayMaps, { position: "topright", collapsed: false })
-    .addTo(leafletMap);
+  // Corrección para refrescar el renderizado dentro del div oculto
+  setTimeout(() => {
+    leafletMap.invalidateSize();
+  }, 200);
 }
 
-// Actualizar Mapa Sinóptico ECMWF (Iframe Windy)
-function initWindyMap(lat, lon) {
-  const iframe = document.getElementById("meteoredMap");
-  if (iframe) {
-    iframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=100%25&height=500&zoom=5&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
-  }
-}
-
-// Búsqueda y gestión de datos de clima
+// Búsqueda y consulta meteorológica
 async function initWeatherApp(cityName) {
   try {
-    document.getElementById("cityName").textContent = `Buscando ${cityName}...`;
+    document.getElementById("cityName").textContent = `Cargando ${cityName}...`;
 
-    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=es&format=json`;
+    // Sanitizar búsqueda eliminando caracteres problemáticos
+    const cleanCity = cityName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanCity)}&count=1&language=es&format=json`;
     const geoRes = await fetch(geoUrl);
+
+    if (!geoRes.ok) throw new Error("Error en geocodificación");
     const geoData = await geoRes.json();
 
     if (!geoData.results || geoData.results.length === 0) {
@@ -124,23 +106,37 @@ async function initWeatherApp(cityName) {
 
     const { latitude, longitude, name, admin1, country } = geoData.results[0];
     const locationLabel = `${name}, ${admin1 || ""}, ${country}`;
+
+    currentCoords = { lat: latitude, lon: longitude, label: locationLabel };
     document.getElementById("cityName").textContent = locationLabel;
 
-    // Actualizar mapas
-    renderLeafletMap(latitude, longitude, locationLabel);
-    initWindyMap(latitude, longitude);
+    // Actualizar Iframe de Windy
+    const iframe = document.getElementById("meteoredMap");
+    if (iframe) {
+      iframe.src = `https://embed.windy.com/embed2.html?lat=${latitude}&lon=${longitude}&detailLat=${latitude}&detailLon=${longitude}&width=100%25&height=500&zoom=5&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
+    }
 
-    // Consulta de datos climáticos
+    // Actualizar mapa físico si está visible
+    if (
+      !document.getElementById("physicalContainer").classList.contains("hidden")
+    ) {
+      renderPhysicalMap(latitude, longitude, locationLabel);
+    }
+
+    // Obtener datos meteorológicos
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto`;
     const weatherRes = await fetch(weatherUrl);
+
+    if (!weatherRes.ok) throw new Error("Error al obtener clima");
     const weatherData = await weatherRes.json();
 
     updateCards(weatherData);
     renderDailyForecast(weatherData.daily);
     renderHourlyForecast(weatherData.hourly);
   } catch (error) {
-    console.error("Error obteniendo el clima:", error);
-    document.getElementById("cityName").textContent = "Error de conexión";
+    console.error("Error en aplicación:", error);
+    document.getElementById("cityName").textContent =
+      "Error de conexión con servicio climático";
   }
 }
 
@@ -248,7 +244,6 @@ function getWeatherDescription(code) {
   return "Normal";
 }
 
-// Generación del informe agrometeorológico PDF
 function exportProfessionalPDF() {
   const cityName = document.getElementById("cityName").textContent || "Curicó";
   const now = new Date();
