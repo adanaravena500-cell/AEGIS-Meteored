@@ -1,19 +1,19 @@
 let leafletMap = null;
 let currentMarker = null;
 let currentCoords = {
-  lat: -34.985,
-  lon: -71.239,
-  label: "Cargando ubicación...",
+  lat: -35.1147,
+  lon: -71.2828,
+  label: "Avenida Quechereguas, Molina, Chile",
 };
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearElem = document.getElementById("currentYear");
   if (yearElem) yearElem.textContent = new Date().getFullYear();
 
-  // 1. Intentar obtener la ubicación actual por GPS del dispositivo/navegador
+  // 1. Obtener la ubicación precisa por GPS del dispositivo
   getUserLocation();
 
-  // Eventos de búsqueda manual (como respaldo)
+  // Eventos para la búsqueda manual
   document.getElementById("searchBtn").addEventListener("click", () => {
     const city = document.getElementById("cityInput").value.trim();
     if (city) initWeatherAppByCity(city);
@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Alternar entre tipos de mapa
+  // Alternar entre mapa de Windy (lluvia/viento) y Mapa Físico (Topográfico)
   const btnWindy = document.getElementById("btnMapWindy");
   const btnPhysical = document.getElementById("btnMapPhysical");
   const windyContainer = document.getElementById("windyContainer");
@@ -57,80 +57,86 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", exportProfessionalPDF);
 });
 
-// Función para obtener la ubicación actual del dispositivo
+// Solicitar la ubicación exacta usando el sensor GPS del dispositivo
 function getUserLocation() {
   if ("geolocation" in navigator) {
     document.getElementById("cityName").textContent =
-      "Detectando ubicación actual por GPS...";
+      "Obteniendo ubicación GPS de alta precisión...";
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        // Cargar clima directamente con las coordenadas detectadas
+        // Cargar clima y mapa directamente con la coordenada GPS detectada
         await initWeatherByCoords(lat, lon);
       },
       (error) => {
-        console.warn("Ubicación rechazada o no disponible:", error.message);
-        // Si el usuario rechaza la ubicación o falla el GPS, usa Curicó por defecto
-        initWeatherAppByCity("Curico");
+        console.warn("GPS no disponible o permiso denegado:", error.message);
+        // Si falla el GPS o se deniega el permiso, buscar Molina como respaldo
+        initWeatherAppByCity("Molina, Chile");
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
+        enableHighAccuracy: true, // Forzar uso de GPS de alta precisión
+        timeout: 15000,
         maximumAge: 0,
       },
     );
   } else {
-    // Si el navegador no soporta geolocalización
-    initWeatherAppByCity("Curico");
+    initWeatherAppByCity("Molina, Chile");
   }
 }
 
-// Cargar clima y mapas a partir de Latitud y Longitud directas (GPS)
+// Cargar clima y mapas a partir de Latitud y Longitud directas (GPS de alta precisión)
 async function initWeatherByCoords(lat, lon) {
   try {
-    // Geocodificación inversa para obtener el nombre del lugar a partir de coordenadas
-    const reverseUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${lat},${lon}&count=1&language=es&format=json`;
+    let locationLabel = `Ubicación GPS (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
 
-    // Consultar nombre de ciudad o usar etiqueta genérica con coordenadas
-    let locationLabel = `Ubicación Detectada (${lat.toFixed(2)}, ${lon.toFixed(2)})`;
+    // Consulta de alta precisión a Nominatim (OpenStreetMap)
     try {
       const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`,
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
       );
       if (geoRes.ok) {
         const geoData = await geoRes.json();
-        const city =
-          geoData.address.city ||
-          geoData.address.town ||
-          geoData.address.village ||
-          geoData.address.county ||
+        const addr = geoData.address || {};
+
+        // Extraer detalles específicos: Calle/Avenida, Villa/Sector, Comuna/Ciudad y Región
+        const road = addr.road || addr.pedestrian || addr.suburb || "";
+        const localArea =
+          addr.town ||
+          addr.city ||
+          addr.village ||
+          addr.municipality ||
+          addr.county ||
           "";
-        const state = geoData.address.state || "";
-        const country = geoData.address.country || "";
-        locationLabel = [city, state, country].filter(Boolean).join(", ");
+        const state = addr.state || "";
+
+        if (road && localArea) {
+          locationLabel = `${road}, ${localArea}, ${state}`;
+        } else if (localArea) {
+          locationLabel = `${localArea}, ${state}, Chile`;
+        } else if (geoData.display_name) {
+          locationLabel = geoData.display_name.split(",").slice(0, 3).join(",");
+        }
       }
     } catch (e) {
-      console.log(
-        "No se pudo obtener el texto exacto de la dirección, usando coordenadas.",
-      );
+      console.log("Error al consultar Nominatim, mostrando coordenadas puras.");
     }
 
     currentCoords = { lat, lon, label: locationLabel };
     document.getElementById("cityName").textContent = locationLabel;
 
-    // Actualizar Iframe de Windy con la posición exacta
+    // Actualizar Iframe de Windy con la posición exactay Zoom en Molina/Quechereguas (Zoom 11)
     updateWindyMap(lat, lon);
 
-    // Actualizar mapa físico si está activo
+    // Actualizar mapa físico topográfico si está activo
     if (
       !document.getElementById("physicalContainer").classList.contains("hidden")
     ) {
       renderPhysicalMap(lat, lon, locationLabel);
     }
 
-    // Cargar datos del clima de Open-Meteo
+    // Cargar datos exactos del clima desde Open-Meteo para las coordenadas exactas
     await fetchWeatherData(lat, lon);
   } catch (error) {
     console.error("Error al cargar clima por coordenadas:", error);
@@ -139,7 +145,7 @@ async function initWeatherByCoords(lat, lon) {
   }
 }
 
-// Cargar clima por nombre de ciudad (Búsqueda manual)
+// Cargar clima por nombre de ciudad (Búsqueda manual de respaldo)
 async function initWeatherAppByCity(cityName) {
   try {
     document.getElementById("cityName").textContent = `Buscando ${cityName}...`;
@@ -151,7 +157,7 @@ async function initWeatherAppByCity(cityName) {
     const geoData = await geoRes.json();
 
     if (!geoData.results || geoData.results.length === 0) {
-      alert("Ciudad no encontrada");
+      alert("Lugar no encontrado. Intenta especificando la comuna o región.");
       document.getElementById("cityName").textContent =
         "Ubicación no encontrada";
       return;
@@ -179,7 +185,7 @@ async function initWeatherAppByCity(cityName) {
   }
 }
 
-// Consultar API de Open-Meteo
+// Consultar la API del Clima de Open-Meteo
 async function fetchWeatherData(lat, lon) {
   const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto`;
   const weatherRes = await fetch(weatherUrl);
@@ -190,21 +196,21 @@ async function fetchWeatherData(lat, lon) {
   renderHourlyForecast(weatherData.hourly);
 }
 
-// Actualizar mapa de Windy
+// Actualizar visor de Windy
 function updateWindyMap(lat, lon) {
   const iframe = document.getElementById("meteoredMap");
   if (iframe) {
-    iframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=100%25&height=500&zoom=7&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
+    iframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=100%25&height=500&zoom=11&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
   }
 }
 
-// Renderizar Mapa Físico Topográfico
+// Renderizar Mapa Físico Topográfico con Leaflet
 function renderPhysicalMap(lat, lon, label) {
   if (leafletMap !== null) {
     leafletMap.remove();
   }
 
-  leafletMap = L.map("map").setView([lat, lon], 8);
+  leafletMap = L.map("map").setView([lat, lon], 13); // Zoom 13 para ver detalle de calles/avenidas
 
   L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
     maxZoom: 17,
@@ -222,6 +228,7 @@ function renderPhysicalMap(lat, lon, label) {
   }, 200);
 }
 
+// Actualizar tarjetas principales de clima
 function updateCards(data) {
   const current = data.current;
   const daily = data.daily;
@@ -246,6 +253,7 @@ function updateCards(data) {
   document.getElementById("airQualityText").textContent = "Buena (AQI 25)";
 }
 
+// Renderizar pronóstico diario (Semana)
 function renderDailyForecast(daily) {
   const container = document.getElementById("dailyContainer");
   container.innerHTML = "";
@@ -277,6 +285,7 @@ function renderDailyForecast(daily) {
   });
 }
 
+// Renderizar pronóstico por horas (Próximas 24h)
 function renderHourlyForecast(hourly) {
   const container = document.getElementById("hourlyContainer");
   container.innerHTML = "";
@@ -326,6 +335,7 @@ function getWeatherDescription(code) {
   return "Normal";
 }
 
+// Generación de reporte PDF técnico y profesional
 function exportProfessionalPDF() {
   const cityName =
     document.getElementById("cityName").textContent || "Ubicación Actual";
