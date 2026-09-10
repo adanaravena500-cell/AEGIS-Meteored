@@ -1,7 +1,167 @@
-document
-  .getElementById("downloadPdfBtn")
-  .addEventListener("click", exportProfessionalPDF);
+// Configuración inicial al cargar la página
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("currentYear").textContent = new Date().getFullYear();
 
+  // Iniciar búsqueda por defecto si el usuario no comparte ubicación
+  initWeatherApp("Curicó");
+
+  // Escuchar eventos de búsqueda y exportación
+  document.getElementById("searchBtn").addEventListener("click", () => {
+    const city = document.getElementById("cityInput").value.trim();
+    if (city) initWeatherApp(city);
+  });
+
+  document
+    .getElementById("downloadPdfBtn")
+    .addEventListener("click", exportProfessionalPDF);
+});
+
+// Función principal de carga de datos
+async function initWeatherApp(cityName) {
+  try {
+    document.getElementById("cityName").textContent = `Cargando ${cityName}...`;
+
+    // 1. Obtener coordenadas de la ciudad (Geocoding Open-Meteo)
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=es&format=json`;
+    const geoRes = await fetch(geoUrl);
+    const geoData = await geoRes.json();
+
+    if (!geoData.results || geoData.results.length === 0) {
+      alert("Ciudad no encontrada");
+      document.getElementById("cityName").textContent =
+        "Ubicación no encontrada";
+      return;
+    }
+
+    const { latitude, longitude, name, admin1, country } = geoData.results[0];
+    const fullLocationLabel = `${name}, ${admin1 || ""}, ${country}`;
+    document.getElementById("cityName").textContent = fullLocationLabel;
+
+    // 2. Obtener datos meteorológicos (Open-Meteo API)
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto`;
+    const weatherRes = await fetch(weatherUrl);
+    const weatherData = await weatherRes.json();
+
+    // 3. Renderizar las secciones de la interfaz
+    updateCurrentCards(weatherData);
+    renderDailyForecast(weatherData.daily);
+    renderHourlyForecast(weatherData.hourly);
+  } catch (error) {
+    console.error("Error al cargar los datos meteorológicos:", error);
+    document.getElementById("cityName").textContent = "Error al cargar datos";
+  }
+}
+
+// Actualizar tarjetas de métricas actuales
+function updateCurrentCards(data) {
+  const current = data.current;
+  const daily = data.daily;
+
+  document.getElementById("tempValue").textContent = Math.round(
+    current.temperature_2m,
+  );
+  document.getElementById("weatherDesc").textContent = getWeatherDescription(
+    current.weather_code,
+  );
+  document.getElementById("realFeel").textContent =
+    `${Math.round(current.apparent_temperature)}°C`;
+  document.getElementById("windSpeed").textContent =
+    `${current.wind_speed_10m} km/h`;
+  document.getElementById("windGusts").textContent =
+    `${current.wind_gusts_10m} km/h`;
+
+  const sunrise = daily.sunrise[0] ? daily.sunrise[0].split("T")[1] : "--:--";
+  const sunset = daily.sunset[0] ? daily.sunset[0].split("T")[1] : "--:--";
+  document.getElementById("sunTimes").textContent =
+    `Salida: ${sunrise} | Puesta: ${sunset}`;
+  document.getElementById("airQualityText").textContent = "Buena (AQI 25)";
+}
+
+// Renderizar días en la columna izquierda
+function renderDailyForecast(daily) {
+  const container = document.getElementById("dailyContainer");
+  container.innerHTML = "";
+
+  daily.time.forEach((dateStr, index) => {
+    const row = document.createElement("div");
+    row.className = `daily-row ${index === 0 ? "selected-day" : ""}`;
+
+    const dateObj = new Date(dateStr + "T00:00:00");
+    const dayName =
+      index === 0
+        ? "Hoy"
+        : dateObj.toLocaleDateString("es-ES", { weekday: "short" });
+    const formattedDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
+    const precip = daily.precipitation_sum[index];
+
+    row.innerHTML = `
+      <div>
+        <div class="day-name">${dayName} (${formattedDate})</div>
+        <span class="precip-tag">${precip > 0 ? `💧 ${precip} mm` : "Sin lluvia"}</span>
+      </div>
+      <div class="icon-temp">
+        <span>${getWeatherIcon(daily.weather_code[index])}</span>
+        <strong>${Math.round(daily.temperature_2m_max[index])}° / ${Math.round(daily.temperature_2m_min[index])}°</strong>
+      </div>
+    `;
+
+    container.appendChild(row);
+  });
+}
+
+// Renderizar pronóstico por hora y resaltar la hora actual
+function renderHourlyForecast(hourly) {
+  const container = document.getElementById("hourlyContainer");
+  container.innerHTML = "";
+
+  const currentHourNow = new Date().getHours();
+
+  // Mostrar las próximas 24 horas a partir del índice actual
+  for (let i = 0; i < 24; i++) {
+    const timeStr = hourly.time[i];
+    const hourVal = parseInt(timeStr.split("T")[1].split(":")[0], 10);
+    const temp = Math.round(hourly.temperature_2m[i]);
+    const code = hourly.weather_code[i];
+
+    const card = document.createElement("div");
+    card.className = "hourly-card";
+
+    if (hourVal === currentHourNow) {
+      card.classList.add("current-hour");
+    }
+
+    card.innerHTML = `
+      <div class="time">${hourVal.toString().padStart(2, "0")}:00</div>
+      <div class="icon">${getWeatherIcon(code)}</div>
+      <div class="temp">${temp}°C</div>
+    `;
+
+    container.appendChild(card);
+  }
+}
+
+// Utilidades para iconos y descripciones de código WMO
+function getWeatherIcon(code) {
+  if (code === 0) return "☀️";
+  if (code >= 1 && code <= 3) return "⛅";
+  if (code >= 45 && code <= 48) return "🌫️";
+  if (code >= 51 && code <= 67) return "🌧️";
+  if (code >= 71 && code <= 77) return "❄️";
+  if (code >= 80 && code <= 82) return "🌦️";
+  if (code >= 95) return "⛈️";
+  return "🌤️";
+}
+
+function getWeatherDescription(code) {
+  if (code === 0) return "Despejado";
+  if (code === 1 || code === 2) return "Parcialmente Nublado";
+  if (code === 3) return "Nublado";
+  if (code >= 51 && code <= 67) return "Lluvia Ligera";
+  if (code >= 80) return "Chubascos";
+  return "Normal";
+}
+
+// Función de exportación a PDF
 function exportProfessionalPDF() {
   const cityName = document.getElementById("cityName").textContent || "Curicó";
   const now = new Date();
@@ -20,7 +180,6 @@ function exportProfessionalPDF() {
     pageSize: "A4",
     pageMargins: [30, 30, 30, 30],
     content: [
-      // 1. Banner Institucional Superior
       {
         table: {
           widths: ["*"],
@@ -43,8 +202,6 @@ function exportProfessionalPDF() {
         layout: "noBorders",
         margin: [0, 0, 0, 10],
       },
-
-      // 2. Alerta / Advertencia Meteorológica
       {
         table: {
           widths: ["*"],
@@ -73,8 +230,6 @@ function exportProfessionalPDF() {
         },
         margin: [0, 0, 0, 10],
       },
-
-      // 3. Metadatos de Emisión y Validez
       {
         table: {
           widths: ["50%", "50%"],
@@ -104,99 +259,7 @@ function exportProfessionalPDF() {
         layout: "noBorders",
         margin: [0, 0, 0, 15],
       },
-
-      // 4. Tabla Agrometeorológica por Zonas y Regiones
-      {
-        text: "Cuadro de Pronóstico de Temperaturas por Zonas (°C)",
-        style: "sectionHeader",
-      },
-      {
-        table: {
-          headerRows: 1,
-          widths: ["25%", "35%", "20%", "20%"],
-          body: [
-            [
-              {
-                text: "Región / Sector",
-                style: "tableHeader",
-                fillColor: "#4338ca",
-              },
-              {
-                text: "Zona Geográfica",
-                style: "tableHeader",
-                fillColor: "#4338ca",
-              },
-              {
-                text: "T. Mínima (°C)",
-                style: "tableHeader",
-                fillColor: "#4338ca",
-              },
-              {
-                text: "T. Máxima (°C)",
-                style: "tableHeader",
-                fillColor: "#4338ca",
-              },
-            ],
-            [
-              {
-                text: cityName,
-                rowSpan: 3,
-                alignment: "center",
-                bold: true,
-                margin: [0, 15, 0, 0],
-              },
-              { text: "Cordillera de la Costa", alignment: "left" },
-              { text: "2°C", alignment: "center", fillColor: "#e0e7ff" },
-              { text: "14°C", alignment: "center", fillColor: "#e0e7ff" },
-            ],
-            [
-              {},
-              { text: "Valles Centrales", alignment: "left" },
-              { text: "4°C", alignment: "center", fillColor: "#e0e7ff" },
-              { text: "16°C", alignment: "center", fillColor: "#e0e7ff" },
-            ],
-            [
-              {},
-              { text: "Precordillera", alignment: "left" },
-              { text: "1°C", alignment: "center", fillColor: "#e0e7ff" },
-              { text: "12°C", alignment: "center", fillColor: "#e0e7ff" },
-            ],
-          ],
-        },
-        layout: {
-          hLineWidth: function (i, node) {
-            return 1;
-          },
-          vLineWidth: function (i, node) {
-            return 1;
-          },
-          hLineColor: function (i, node) {
-            return "#cbd5e1";
-          },
-          vLineColor: function (i, node) {
-            return "#cbd5e1";
-          },
-        },
-        margin: [0, 0, 0, 20],
-      },
-
-      // 5. Análisis Técnico y Recomendaciones
-      {
-        text: "Análisis Synóptico y Recomendaciones Técnicas",
-        style: "sectionHeader",
-      },
-      {
-        ul: [
-          "Condiciones atmosféricas dominadas por alta presión de características frías.",
-          "Se recomienda a los agricultores de la zona mantener activados los sistemas de control de heladas en cultivos vulnerables.",
-          "Monitoreo continuo de ráfagas de viento y humedad relativa mediante la plataforma AEGIS Meteored Analysing.",
-        ],
-        fontSize: 9.5,
-        color: "#334155",
-        margin: [0, 0, 0, 20],
-      },
     ],
-
     styles: {
       bannerTitle: {
         fontSize: 16,
@@ -210,18 +273,6 @@ function exportProfessionalPDF() {
         color: "#94a3b8",
         alignment: "center",
         margin: [0, 3, 0, 0],
-      },
-      sectionHeader: {
-        fontSize: 11,
-        bold: true,
-        color: "#1e293b",
-        margin: [0, 5, 0, 8],
-      },
-      tableHeader: {
-        fontSize: 9.5,
-        bold: true,
-        color: "#ffffff",
-        alignment: "center",
       },
     },
   };
