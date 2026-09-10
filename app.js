@@ -3,26 +3,26 @@ let currentMarker = null;
 let currentCoords = {
   lat: -34.985,
   lon: -71.239,
-  label: "Curicó, Región del Maule, Chile",
+  label: "Cargando ubicación...",
 };
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearElem = document.getElementById("currentYear");
   if (yearElem) yearElem.textContent = new Date().getFullYear();
 
-  // Cargar datos por defecto
-  initWeatherApp("Curico");
+  // 1. Intentar obtener la ubicación actual por GPS del dispositivo/navegador
+  getUserLocation();
 
-  // Eventos de búsqueda
+  // Eventos de búsqueda manual (como respaldo)
   document.getElementById("searchBtn").addEventListener("click", () => {
     const city = document.getElementById("cityInput").value.trim();
-    if (city) initWeatherApp(city);
+    if (city) initWeatherAppByCity(city);
   });
 
   document.getElementById("cityInput").addEventListener("keypress", (e) => {
     if (e.key === "Enter") {
       const city = document.getElementById("cityInput").value.trim();
-      if (city) initWeatherApp(city);
+      if (city) initWeatherAppByCity(city);
     }
   });
 
@@ -57,32 +57,90 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", exportProfessionalPDF);
 });
 
-// Renderizar Mapa Físico Topográfico
-function renderPhysicalMap(lat, lon, label) {
-  if (leafletMap !== null) {
-    leafletMap.remove();
+// Función para obtener la ubicación actual del dispositivo
+function getUserLocation() {
+  if ("geolocation" in navigator) {
+    document.getElementById("cityName").textContent =
+      "Detectando ubicación actual por GPS...";
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        // Cargar clima directamente con las coordenadas detectadas
+        await initWeatherByCoords(lat, lon);
+      },
+      (error) => {
+        console.warn("Ubicación rechazada o no disponible:", error.message);
+        // Si el usuario rechaza la ubicación o falla el GPS, usa Curicó por defecto
+        initWeatherAppByCity("Curico");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      },
+    );
+  } else {
+    // Si el navegador no soporta geolocalización
+    initWeatherAppByCity("Curico");
   }
-
-  leafletMap = L.map("map").setView([lat, lon], 7);
-
-  L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
-    maxZoom: 17,
-    attribution:
-      "Map data: &copy; OpenStreetMap contributors, SRTM | Style: OpenTopoMap",
-  }).addTo(leafletMap);
-
-  currentMarker = L.marker([lat, lon])
-    .addTo(leafletMap)
-    .bindPopup(`<b>${label}</b>`)
-    .openPopup();
-
-  setTimeout(() => {
-    leafletMap.invalidateSize();
-  }, 200);
 }
 
-// Búsqueda y gestión del clima
-async function initWeatherApp(cityName) {
+// Cargar clima y mapas a partir de Latitud y Longitud directas (GPS)
+async function initWeatherByCoords(lat, lon) {
+  try {
+    // Geocodificación inversa para obtener el nombre del lugar a partir de coordenadas
+    const reverseUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${lat},${lon}&count=1&language=es&format=json`;
+
+    // Consultar nombre de ciudad o usar etiqueta genérica con coordenadas
+    let locationLabel = `Ubicación Detectada (${lat.toFixed(2)}, ${lon.toFixed(2)})`;
+    try {
+      const geoRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`,
+      );
+      if (geoRes.ok) {
+        const geoData = await geoRes.json();
+        const city =
+          geoData.address.city ||
+          geoData.address.town ||
+          geoData.address.village ||
+          geoData.address.county ||
+          "";
+        const state = geoData.address.state || "";
+        const country = geoData.address.country || "";
+        locationLabel = [city, state, country].filter(Boolean).join(", ");
+      }
+    } catch (e) {
+      console.log(
+        "No se pudo obtener el texto exacto de la dirección, usando coordenadas.",
+      );
+    }
+
+    currentCoords = { lat, lon, label: locationLabel };
+    document.getElementById("cityName").textContent = locationLabel;
+
+    // Actualizar Iframe de Windy con la posición exacta
+    updateWindyMap(lat, lon);
+
+    // Actualizar mapa físico si está activo
+    if (
+      !document.getElementById("physicalContainer").classList.contains("hidden")
+    ) {
+      renderPhysicalMap(lat, lon, locationLabel);
+    }
+
+    // Cargar datos del clima de Open-Meteo
+    await fetchWeatherData(lat, lon);
+  } catch (error) {
+    console.error("Error al cargar clima por coordenadas:", error);
+    document.getElementById("cityName").textContent =
+      "Error al consultar la ubicación actual";
+  }
+}
+
+// Cargar clima por nombre de ciudad (Búsqueda manual)
+async function initWeatherAppByCity(cityName) {
   try {
     document.getElementById("cityName").textContent = `Buscando ${cityName}...`;
 
@@ -105,32 +163,63 @@ async function initWeatherApp(cityName) {
     currentCoords = { lat: latitude, lon: longitude, label: locationLabel };
     document.getElementById("cityName").textContent = locationLabel;
 
-    // Actualizar Windy
-    const iframe = document.getElementById("meteoredMap");
-    if (iframe) {
-      iframe.src = `https://embed.windy.com/embed2.html?lat=${latitude}&lon=${longitude}&detailLat=${latitude}&detailLon=${longitude}&width=100%25&height=500&zoom=5&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
-    }
+    updateWindyMap(latitude, longitude);
 
-    // Actualizar Mapa Físico si está activo
     if (
       !document.getElementById("physicalContainer").classList.contains("hidden")
     ) {
       renderPhysicalMap(latitude, longitude, locationLabel);
     }
 
-    // Obtener pronóstico
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto`;
-    const weatherRes = await fetch(weatherUrl);
-    const weatherData = await weatherRes.json();
-
-    updateCards(weatherData);
-    renderDailyForecast(weatherData.daily);
-    renderHourlyForecast(weatherData.hourly);
+    await fetchWeatherData(latitude, longitude);
   } catch (error) {
-    console.error("Error en aplicación:", error);
+    console.error("Error en búsqueda manual:", error);
     document.getElementById("cityName").textContent =
       "Error al consultar servicio";
   }
+}
+
+// Consultar API de Open-Meteo
+async function fetchWeatherData(lat, lon) {
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto`;
+  const weatherRes = await fetch(weatherUrl);
+  const weatherData = await weatherRes.json();
+
+  updateCards(weatherData);
+  renderDailyForecast(weatherData.daily);
+  renderHourlyForecast(weatherData.hourly);
+}
+
+// Actualizar mapa de Windy
+function updateWindyMap(lat, lon) {
+  const iframe = document.getElementById("meteoredMap");
+  if (iframe) {
+    iframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=100%25&height=500&zoom=7&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
+  }
+}
+
+// Renderizar Mapa Físico Topográfico
+function renderPhysicalMap(lat, lon, label) {
+  if (leafletMap !== null) {
+    leafletMap.remove();
+  }
+
+  leafletMap = L.map("map").setView([lat, lon], 8);
+
+  L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+    maxZoom: 17,
+    attribution:
+      "Map data: &copy; OpenStreetMap contributors, SRTM | Style: OpenTopoMap",
+  }).addTo(leafletMap);
+
+  currentMarker = L.marker([lat, lon])
+    .addTo(leafletMap)
+    .bindPopup(`<b>${label}</b>`)
+    .openPopup();
+
+  setTimeout(() => {
+    leafletMap.invalidateSize();
+  }, 200);
 }
 
 function updateCards(data) {
@@ -238,7 +327,8 @@ function getWeatherDescription(code) {
 }
 
 function exportProfessionalPDF() {
-  const cityName = document.getElementById("cityName").textContent || "Curicó";
+  const cityName =
+    document.getElementById("cityName").textContent || "Ubicación Actual";
   const now = new Date();
   const fechaEmision = now.toLocaleDateString("es-CL", {
     weekday: "long",
@@ -373,19 +463,19 @@ function exportProfessionalPDF() {
                 bold: true,
                 margin: [0, 15, 0, 0],
               },
-              { text: "Cordillera de la Costa", alignment: "left" },
+              { text: "Sector Norte / Costa", alignment: "left" },
               { text: "2°C", alignment: "center", fillColor: "#e0e7ff" },
               { text: "14°C", alignment: "center", fillColor: "#e0e7ff" },
             ],
             [
               {},
-              { text: "Valles Centrales", alignment: "left" },
+              { text: "Sector Centro / Valle", alignment: "left" },
               { text: "4°C", alignment: "center", fillColor: "#e0e7ff" },
               { text: "16°C", alignment: "center", fillColor: "#e0e7ff" },
             ],
             [
               {},
-              { text: "Precordillera", alignment: "left" },
+              { text: "Sector Sur / Cordillera", alignment: "left" },
               { text: "1°C", alignment: "center", fillColor: "#e0e7ff" },
               { text: "12°C", alignment: "center", fillColor: "#e0e7ff" },
             ],
